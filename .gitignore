@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+.env
+
+# Secrets — NEVER commit these
+.env
+.env.local
+.env.production
+*.key
+
+# Data and logs
+*.log
+*.db
+*.sqlite
+*.sqlite3
+sessions/
+data/cache/
+predictions/*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Node (if you add any JS tooling later)
+node_modules/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Coverage
+.coverage
+htmlcov/
