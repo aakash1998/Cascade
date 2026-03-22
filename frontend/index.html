@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cascade — Ripple Effect Engine</title>
+  <style>
+    /* ── Reset + Base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0a0e1a;
+      --bg2:      #111827;
+      --bg3:      #1c2435;
+      --border:   #1e2d45;
+      --accent:   #3b82f6;
+      --accent2:  #60a5fa;
+      --green:    #22c55e;
+      --yellow:   #eab308;
+      --red:      #ef4444;
+      --text:     #e2e8f0;
+      --text2:    #94a3b8;
+      --text3:    #475569;
+      --radius:   10px;
+      --shadow:   0 4px 24px rgba(0,0,0,0.4);
+    }
+    html { font-size: 15px; scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { cursor: pointer; border: none; outline: none; }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    #app { max-width: 900px; margin: 0 auto; padding: 0 16px 60px; }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      padding: 32px 0 20px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .logo { font-size: 1.8rem; }
+    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p { color: var(--text2); font-size: 0.85rem; margin-top: 2px; }
+
+    /* ── Query Box ────────────────────────────────────────── */
+    #query-section { margin-bottom: 20px; }
+    #query-form { position: relative; }
+    #query-input {
+      width: 100%; padding: 16px 120px 16px 18px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-size: 1rem; resize: none; min-height: 72px;
+      transition: border-color 0.2s;
+    }
+    #query-input:focus { outline: none; border-color: var(--accent); }
+    #query-input::placeholder { color: var(--text3); }
+    #submit-btn {
+      position: absolute; right: 12px; bottom: 12px;
+      background: var(--accent); color: #fff;
+      padding: 8px 20px; border-radius: 7px;
+      font-size: 0.9rem; font-weight: 600;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    #submit-btn:hover { background: var(--accent2); }
+    #submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #char-count { color: var(--text3); font-size: 0.75rem; margin-top: 4px; text-align: right; }
+
+    /* ── Profile Panel ────────────────────────────────────── */
+    #profile-toggle {
+      background: none; color: var(--text2); border: 1px solid var(--border);
+      padding: 6px 14px; border-radius: 6px; font-size: 0.8rem;
+      margin-bottom: 12px; transition: color 0.15s;
+    }
+    #profile-toggle:hover { color: var(--text); }
+    #profile-panel {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      margin-bottom: 16px; display: none;
+    }
+    #profile-panel h3 { font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .profile-field { display: flex; flex-direction: column; gap: 4px; }
+    .profile-field label { font-size: 0.75rem; color: var(--text3); }
+    .profile-field input {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 0.85rem;
+    }
+    .profile-field input:focus { outline: none; border-color: var(--accent); }
+    #save-profile-btn {
+      background: var(--accent); color: #fff; padding: 7px 16px;
+      border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+      margin-top: 10px;
+    }
+
+    /* ── Status Bar ───────────────────────────────────────── */
+    #status-bar {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
+      margin-bottom: 16px; display: none;
+      align-items: center; gap: 10px;
+    }
+    #status-bar.active { display: flex; }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #status-msg { color: var(--text2); font-size: 0.85rem; }
+
+    /* ── Complexity Score ─────────────────────────────────── */
+    #complexity-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      margin-bottom: 16px; display: none;
+    }
+    #complexity-card h3 { font-size: 0.8rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .complexity-bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .dim-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .dim-label { font-size: 0.65rem; color: var(--text3); text-align: center; }
+    .dim-value { font-size: 1.1rem; font-weight: 700; }
+    .dim-value.high { color: var(--red); }
+    .dim-value.med  { color: var(--yellow); }
+    .dim-value.low  { color: var(--green); }
+
+    /* ── Agent Grid ───────────────────────────────────────── */
+    #agents-section { margin-bottom: 20px; display: none; }
+    #agents-section h2 { font-size: 0.8rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    #agents-grid {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .agent-bubble {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px;
+      font-size: 0.75rem; color: var(--text3);
+      transition: all 0.3s; cursor: default; min-width: 100px; text-align: center;
+    }
+    .agent-bubble .bubble-name { font-weight: 600; color: var(--text2); }
+    .agent-bubble .bubble-conf { font-size: 0.7rem; margin-top: 2px; }
+    .agent-bubble.running { border-color: var(--accent); color: var(--accent2); animation: pulse-border 1.5s ease-in-out infinite; }
+    .agent-bubble.done { border-color: var(--green); background: rgba(34,197,94,0.08); }
+    .agent-bubble.done .bubble-name { color: var(--green); }
+    .agent-bubble.failed { border-color: var(--text3); opacity: 0.5; }
+    @keyframes pulse-border { 0%,100% { border-color: var(--accent); } 50% { border-color: var(--accent2); } }
+
+    /* ── Data Sources ─────────────────────────────────────── */
+    #sources-bar { display: none; margin-bottom: 14px; }
+    #sources-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .source-chip {
+      background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);
+      color: var(--accent2); border-radius: 20px; padding: 3px 10px; font-size: 0.7rem;
+    }
+
+    /* ── Ripple Chain ─────────────────────────────────────── */
+    #chain-section {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+      margin-bottom: 16px; display: none;
+    }
+    #chain-section h2 { font-size: 0.8rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    #chain-links { margin-bottom: 14px; }
+    .chain-link {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .chain-link:last-child { border-bottom: none; }
+    .link-from { color: var(--accent2); font-weight: 600; min-width: 100px; }
+    .link-arrow { color: var(--text3); }
+    .link-to { color: var(--text); font-weight: 600; min-width: 100px; }
+    .link-mechanism { color: var(--text2); flex: 1; }
+    .link-conf {
+      font-size: 0.7rem; padding: 2px 7px; border-radius: 10px;
+      font-weight: 600; white-space: nowrap;
+    }
+    .conf-high { background: rgba(34,197,94,0.15); color: var(--green); }
+    .conf-med  { background: rgba(234,179,8,0.15);  color: var(--yellow); }
+    .conf-low  { background: rgba(239,68,68,0.15);  color: var(--red); }
+    #chain-narrative {
+      color: var(--text2); font-size: 0.88rem; line-height: 1.7;
+      white-space: pre-wrap; border-top: 1px solid var(--border); padding-top: 14px;
+      margin-top: 4px;
+    }
+
+    /* ── Scenarios ────────────────────────────────────────── */
+    #scenarios-section { margin-bottom: 16px; display: none; }
+    #scenarios-section h2 { font-size: 0.8rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .scenario-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .scenario-tab {
+      padding: 7px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+      background: var(--bg3); color: var(--text3); border: 1px solid var(--border);
+      transition: all 0.15s;
+    }
+    .scenario-tab.active.best   { background: rgba(34,197,94,0.15);  border-color: var(--green);  color: var(--green); }
+    .scenario-tab.active.base   { background: rgba(59,130,246,0.15); border-color: var(--accent); color: var(--accent2); }
+    .scenario-tab.active.worst  { background: rgba(239,68,68,0.15);  border-color: var(--red);    color: var(--red); }
+    .scenario-content { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    .scenario-content h4 { font-size: 0.8rem; color: var(--text3); margin-bottom: 6px; }
+    .scenario-content p { font-size: 0.85rem; color: var(--text2); margin-bottom: 10px; }
+    .assumption-list { list-style: none; padding: 0; }
+    .assumption-list li { font-size: 0.8rem; color: var(--text2); padding: 3px 0; }
+    .assumption-list li::before { content: "→ "; color: var(--text3); }
+    .probability-badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-bottom: 8px; }
+    .prob-High   { background: rgba(34,197,94,0.15);  color: var(--green); }
+    .prob-Medium { background: rgba(234,179,8,0.15);  color: var(--yellow); }
+    .prob-Low    { background: rgba(239,68,68,0.15);  color: var(--red); }
+
+    /* ── Personal Impact ──────────────────────────────────── */
+    #personal-section {
+      background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.03));
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: var(--radius); padding: 18px;
+      margin-bottom: 16px; display: none;
+    }
+    #personal-section h2 { font-size: 0.8rem; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    #personal-text { font-size: 0.88rem; color: var(--text); line-height: 1.7; white-space: pre-wrap; }
+
+    /* ── Final Summary ────────────────────────────────────── */
+    #summary-section {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+      margin-bottom: 16px; display: none;
+    }
+    #summary-section h2 { font-size: 0.8rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    #summary-text { font-size: 0.88rem; color: var(--text2); line-height: 1.7; white-space: pre-wrap; }
+    #summary-text strong { color: var(--text); }
+
+    /* ── Done Bar ─────────────────────────────────────────── */
+    #done-bar {
+      background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3);
+      border-radius: var(--radius); padding: 14px 18px;
+      margin-bottom: 16px; display: none;
+      justify-content: space-between; align-items: center;
+    }
+    #done-bar .done-meta { font-size: 0.8rem; color: var(--text2); }
+    #done-bar .done-meta span { color: var(--green); font-weight: 600; }
+    #new-query-btn {
+      background: var(--accent); color: #fff;
+      padding: 8px 18px; border-radius: 7px; font-size: 0.85rem; font-weight: 600;
+    }
+    #new-query-btn:hover { background: var(--accent2); }
+
+    /* ── Flags / Warnings ─────────────────────────────────── */
+    .flag-badge {
+      font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
+      background: rgba(234,179,8,0.15); color: var(--yellow);
+      display: inline-block; margin: 2px;
+    }
+
+    /* ── Example queries ──────────────────────────────────── */
+    #examples { margin-bottom: 16px; }
+    #examples p { font-size: 0.75rem; color: var(--text3); margin-bottom: 6px; }
+    .example-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .example-chip {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text2); padding: 5px 12px; border-radius: 20px;
+      font-size: 0.75rem; cursor: pointer; transition: all 0.15s;
+    }
+    .example-chip:hover { border-color: var(--accent); color: var(--accent2); }
+
+    /* ── Historical ───────────────────────────────────────── */
+    #historical-section { margin-bottom: 16px; display: none; }
+    #historical-section h2 { font-size: 0.8rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .historical-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    }
+    .hist-event { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+    .hist-year  { color: var(--text3); font-size: 0.75rem; }
+    .hist-summary { color: var(--text2); font-size: 0.82rem; }
+    .hist-lesson  { color: var(--accent2); font-size: 0.78rem; margin-top: 4px; font-style: italic; }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .profile-grid { grid-template-columns: 1fr; }
+      .complexity-bars { grid-template-columns: repeat(3, 1fr); }
+      .chain-link { flex-direction: column; align-items: flex-start; }
+      .link-from, .link-to { min-width: unset; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header>
+    <span class="logo">🌊</span>
+    <div>
+      <h1>Cascade</h1>
+      <p>Type any world event — watch AI agents trace every ripple in real time</p>
+    </div>
+  </header>
+
+  <!-- ── Profile ─────────────────────────────────────────── -->
+  <button id="profile-toggle">⚙ Personalise (optional)</button>
+  <div id="profile-panel">
+    <h3>Your profile — makes the analysis specific to your situation</h3>
+    <div class="profile-grid">
+      <div class="profile-field">
+        <label>Job title / role</label>
+        <input type="text" id="p-job" placeholder="Software engineer">
+      </div>
+      <div class="profile-field">
+        <label>City + country</label>
+        <input type="text" id="p-city" placeholder="Calgary, Canada">
+      </div>
+      <div class="profile-field">
+        <label>Industry / sector</label>
+        <input type="text" id="p-sector" placeholder="Technology">
+      </div>
+      <div class="profile-field">
+        <label>Household type</label>
+        <input type="text" id="p-household" placeholder="Family with 2 kids">
+      </div>
+      <div class="profile-field">
+        <label>Housing situation</label>
+        <input type="text" id="p-housing" placeholder="Own with mortgage">
+      </div>
+      <div class="profile-field">
+        <label>Income bracket</label>
+        <input type="text" id="p-income" placeholder="$60k–$100k">
+      </div>
+    </div>
+    <div class="profile-field" style="margin-top:10px">
+      <label>Anything else relevant?</label>
+      <input type="text" id="p-extra" placeholder="I have USD savings, my employer exports to China...">
+    </div>
+    <button id="save-profile-btn">Save profile</button>
+  </div>
+
+  <!-- ── Query ───────────────────────────────────────────── -->
+  <div id="query-section">
+    <form id="query-form" onsubmit="return false">
+      <textarea
+        id="query-input"
+        placeholder="What does the US-China trade war mean for a software engineer in Calgary?"
+        maxlength="500"
+        rows="2"
+      ></textarea>
+      <button type="submit" id="submit-btn">Analyse →</button>
+    </form>
+    <div id="char-count">0 / 500</div>
+  </div>
+
+  <!-- ── Example Queries ─────────────────────────────────── -->
+  <div id="examples">
+    <p>Try an example:</p>
+    <div class="example-chips">
+      <span class="example-chip">US-China trade war impact on tech sector</span>
+      <span class="example-chip">Federal Reserve rate hike effects</span>
+      <span class="example-chip">Russia-Ukraine war energy crisis</span>
+      <span class="example-chip">AI replacing white-collar jobs</span>
+      <span class="example-chip">OPEC production cuts ripple effects</span>
+    </div>
+  </div>
+
+  <!-- ── Status ──────────────────────────────────────────── -->
+  <div id="status-bar">
+    <div class="spinner"></div>
+    <span id="status-msg">Starting analysis...</span>
+  </div>
+
+  <!-- ── Complexity ──────────────────────────────────────── -->
+  <div id="complexity-card">
+    <h3>Query complexity score</h3>
+    <div class="complexity-bars">
+      <div class="dim-bar">
+        <div class="dim-value" id="c-geo">—</div>
+        <div class="dim-label">Geographic</div>
+      </div>
+      <div class="dim-bar">
+        <div class="dim-value" id="c-domain">—</div>
+        <div class="dim-label">Domains</div>
+      </div>
+      <div class="dim-bar">
+        <div class="dim-value" id="c-depth">—</div>
+        <div class="dim-label">Causal depth</div>
+      </div>
+      <div class="dim-bar">
+        <div class="dim-value" id="c-time">—</div>
+        <div class="dim-label">Time horizon</div>
+      </div>
+      <div class="dim-bar">
+        <div class="dim-value" id="c-personal">—</div>
+        <div class="dim-label">Personal</div>
+      </div>
+    </div>
+    <div style="margin-top:10px; font-size:0.75rem; color:var(--text3)">
+      Total: <span id="c-total" style="color:var(--text2); font-weight:600">—</span>
+      → <span id="c-agents" style="color:var(--accent2); font-weight:600">—</span> agents
+    </div>
+  </div>
+
+  <!-- ── Data Sources ─────────────────────────────────────── -->
+  <div id="sources-bar">
+    <div style="font-size:0.75rem; color:var(--text3); margin-bottom:6px">Data sources used:</div>
+    <div id="sources-list"></div>
+  </div>
+
+  <!-- ── Agent Grid ───────────────────────────────────────── -->
+  <div id="agents-section">
+    <h2>Active agents</h2>
+    <div id="agents-grid"></div>
+  </div>
+
+  <!-- ── Ripple Chain ─────────────────────────────────────── -->
+  <div id="chain-section">
+    <h2>Causal ripple chain</h2>
+    <div id="chain-links"></div>
+    <div id="chain-narrative"></div>
+  </div>
+
+  <!-- ── Scenarios ────────────────────────────────────────── -->
+  <div id="scenarios-section">
+    <h2>Scenario branches</h2>
+    <div class="scenario-tabs">
+      <button class="scenario-tab active best"  data-scenario="best">Best case</button>
+      <button class="scenario-tab        base"  data-scenario="base">Base case</button>
+      <button class="scenario-tab        worst" data-scenario="worst">Worst case</button>
+    </div>
+    <div id="scenario-content" class="scenario-content"></div>
+  </div>
+
+  <!-- ── Historical ───────────────────────────────────────── -->
+  <div id="historical-section">
+    <h2>Historical parallels</h2>
+    <div id="historical-list"></div>
+  </div>
+
+  <!-- ── Personal Impact ──────────────────────────────────── -->
+  <div id="personal-section">
+    <h2>Your personal impact</h2>
+    <div id="personal-text"></div>
+  </div>
+
+  <!-- ── Final Summary ────────────────────────────────────── -->
+  <div id="summary-section">
+    <h2>Analysis summary</h2>
+    <div id="summary-text"></div>
+  </div>
+
+  <!-- ── Done Bar ─────────────────────────────────────────── -->
+  <div id="done-bar">
+    <div class="done-meta">
+      Analysis complete ·
+      <span id="done-agents">—</span> agents ·
+      confidence <span id="done-confidence">—</span> ·
+      <span id="done-predictions">—</span> predictions logged
+    </div>
+    <button id="new-query-btn">New query</button>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const state = {
+  sessionId:  localStorage.getItem('cascade_session') || generateId(),
+  scenarios:  {},
+  activeScen: 'best',
+  isRunning:  false,
+  eventSource: null,
+};
+localStorage.setItem('cascade_session', state.sessionId);
+
+// ── DOM ────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const queryInput   = $('query-input');
+const submitBtn    = $('submit-btn');
+const charCount    = $('char-count');
+const statusBar    = $('status-bar');
+const statusMsg    = $('status-msg');
+const agentsGrid   = $('agents-grid');
+const chainLinks   = $('chain-links');
+const chainNarr    = $('chain-narrative');
+const personalText = $('personal-text');
+const summaryText  = $('summary-text');
+
+// ── Profile ────────────────────────────────────────────────
+$('profile-toggle').addEventListener('click', () => {
+  const panel = $('profile-panel');
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+});
+
+$('save-profile-btn').addEventListener('click', async () => {
+  const profile = {
+    job:            $('p-job').value.trim()       || undefined,
+    city:           $('p-city').value.trim()      || undefined,
+    sector:         $('p-sector').value.trim()    || undefined,
+    household:      $('p-household').value.trim() || undefined,
+    housing:        $('p-housing').value.trim()   || undefined,
+    income_bracket: $('p-income').value.trim()    || undefined,
+    extra_context:  $('p-extra').value.trim()     || undefined,
+  };
+  try {
+    await fetch(`/profile?session_id=${state.sessionId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(profile),
+    });
+    $('profile-toggle').textContent = '✓ Profile saved';
+    setTimeout(() => { $('profile-toggle').textContent = '⚙ Personalise (optional)'; }, 2000);
+  } catch(e) { console.error('Profile save failed', e); }
+});
+
+// ── Query input helpers ────────────────────────────────────
+queryInput.addEventListener('input', () => {
+  charCount.textContent = `${queryInput.value.length} / 500`;
+});
+
+// Cmd/Ctrl+Enter to submit
+queryInput.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitQuery();
+});
+
+// Example chips
+document.querySelectorAll('.example-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    queryInput.value = chip.textContent;
+    charCount.textContent = `${queryInput.value.length} / 500`;
+    queryInput.focus();
+  });
+});
+
+// Submit button
+$('query-form').addEventListener('submit', submitQuery);
+$('new-query-btn').addEventListener('click', resetUI);
+
+// ── Scenario tabs ──────────────────────────────────────────
+document.querySelectorAll('.scenario-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.activeScen = tab.dataset.scenario;
+    renderActiveScenario();
+  });
+});
+
+// ── Main query handler ─────────────────────────────────────
+function submitQuery() {
+  const query = queryInput.value.trim();
+  if (!query || state.isRunning) return;
+  state.isRunning = true;
+
+  // Reset all output panels
+  resetOutputPanels();
+  show('status-bar');
+  submitBtn.disabled = true;
+  statusMsg.textContent = 'Starting analysis...';
+
+  // Close any existing SSE connection
+  if (state.eventSource) { state.eventSource.close(); }
+
+  const url = `/stream?query=${encodeURIComponent(query)}&session_id=${state.sessionId}`;
+  state.eventSource = new EventSource(url);
+
+  state.eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handleEvent(data);
+    } catch(e) { console.error('Parse error', e, event.data); }
+  };
+
+  state.eventSource.onerror = (err) => {
+    console.error('SSE error', err);
+    setStatus('Connection error — please try again');
+    finishRun();
+  };
+}
+
+// ── Event handler ──────────────────────────────────────────
+function handleEvent(d) {
+  switch(d.type) {
+
+    case 'status':
+      setStatus(d.message);
+      break;
+
+    case 'manifest':
+      renderManifest(d);
+      break;
+
+    case 'data_fetched':
+      renderSources(d.sources);
+      break;
+
+    case 'agent_result':
+      renderAgentResult(d);
+      break;
+
+    case 'agent_timeout':
+      markAgentFailed(d.domain);
+      break;
+
+    case 'chain_ready':
+      renderChainLinks(d.ripple_chain);
+      renderFlags(d.hallucination_flags);
+      show('chain-section');
+      break;
+
+    case 'chain_token':
+      chainNarr.textContent += d.token;
+      break;
+
+    case 'scenarios':
+      state.scenarios = {};
+      (d.scenarios || []).forEach(s => { state.scenarios[s.label.replace('_case','')] = s; });
+      renderActiveScenario();
+      show('scenarios-section');
+      if (d.historical && d.historical.length) renderHistorical(d.historical);
+      break;
+
+    case 'personal_token':
+      show('personal-section');
+      personalText.textContent += d.token;
+      break;
+
+    case 'summary_token':
+      show('summary-section');
+      summaryText.innerHTML = formatMarkdown(summaryText.textContent + d.token);
+      break;
+
+    case 'done':
+      renderDone(d);
+      finishRun();
+      break;
+
+    case 'error':
+      setStatus('Error: ' + d.message);
+      finishRun();
+      break;
+
+    case 'heartbeat':
+      break; // keep-alive, ignore
+  }
+}
+
+// ── Render functions ───────────────────────────────────────
+
+function renderManifest(d) {
+  // Complexity card
+  const c = d.complexity || {};
+  const score = parseFloat(c.total || 0);
+  $('c-geo').textContent      = (c.geographic_scope  || '—').toString().slice(0,3);
+  $('c-domain').textContent   = (c.domain_breadth    || '—').toString().slice(0,3);
+  $('c-depth').textContent    = (c.causal_depth      || '—').toString().slice(0,3);
+  $('c-time').textContent     = (c.time_horizon      || '—').toString().slice(0,3);
+  $('c-personal').textContent = (c.personal_relevance|| '—').toString().slice(0,3);
+  $('c-total').textContent    = score.toFixed(1);
+  $('c-agents').textContent   = c.agent_count || '—';
+
+  // Colour code the values
+  ['c-geo','c-domain','c-depth','c-time','c-personal'].forEach(id => {
+    const el = $(id); const v = parseFloat(el.textContent);
+    el.className = 'dim-value ' + (v >= 4 ? 'high' : v >= 2.5 ? 'med' : 'low');
+  });
+
+  show('complexity-card');
+
+  // Agent bubbles
+  agentsGrid.innerHTML = '';
+  (d.agents || []).forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'agent-bubble running';
+    div.id = `agent-${a.key}`;
+    div.innerHTML = `<div class="bubble-name">${a.name}</div><div class="bubble-conf">waiting...</div>`;
+    div.title = a.focus || '';
+    agentsGrid.appendChild(div);
+  });
+  show('agents-section');
+}
+
+function renderSources(sources) {
+  if (!sources || !sources.length) return;
+  const list = $('sources-list');
+  list.innerHTML = sources.map(s => `<span class="source-chip">${s}</span>`).join('');
+  show('sources-bar');
+}
+
+function renderAgentResult(d) {
+  const bubble = $(`agent-${d.domain}`);
+  if (bubble) {
+    const conf = (d.confidence * 100).toFixed(0);
+    const sev  = d.severity || 'medium';
+    bubble.className = 'agent-bubble done';
+    bubble.querySelector('.bubble-conf').textContent = `${conf}% · ${sev}`;
+    bubble.title = d.finding ? d.finding.slice(0, 200) : '';
+  }
+}
+
+function markAgentFailed(domain) {
+  const bubble = $(`agent-${domain}`);
+  if (bubble) bubble.className = 'agent-bubble failed';
+}
+
+function renderChainLinks(chain) {
+  chainLinks.innerHTML = '';
+  (chain || []).slice(0, 10).forEach(link => {
+    const conf = link.confidence || 0;
+    const confClass = conf >= 0.75 ? 'conf-high' : conf >= 0.55 ? 'conf-med' : 'conf-low';
+    const div = document.createElement('div');
+    div.className = 'chain-link';
+    div.innerHTML = `
+      <span class="link-from">${link.from_domain}</span>
+      <span class="link-arrow">→</span>
+      <span class="link-to">${link.to_domain}</span>
+      <span class="link-mechanism">${(link.mechanism||'').slice(0,150)}</span>
+      <span class="link-conf ${confClass}">${(conf*100).toFixed(0)}%</span>
+    `;
+    chainLinks.appendChild(div);
+  });
+}
+
+function renderFlags(flags) {
+  if (!flags || !flags.length) return;
+  const container = document.createElement('div');
+  container.style.marginTop = '8px';
+  flags.forEach(f => {
+    const b = document.createElement('span');
+    b.className = 'flag-badge';
+    b.textContent = `⚠ ${f.agent}: ${f.flag_type}`;
+    b.title = f.message || '';
+    container.appendChild(b);
+  });
+  chainLinks.appendChild(container);
+}
+
+function renderActiveScenario() {
+  const content = $('scenario-content');
+  const key = state.activeScen;
+  const s = state.scenarios[key];
+  if (!s) { content.innerHTML = '<p style="color:var(--text3);font-size:0.85rem">No scenario data yet.</p>'; return; }
+
+  const probClass = `prob-${s.probability}`;
+  const assumptions = (s.key_assumptions || []).map(a => `<li>${a}</li>`).join('');
+
+  content.innerHTML = `
+    <span class="probability-badge ${probClass}">${s.probability} probability</span>
+    <p>${s.ripple_summary || ''}</p>
+    ${assumptions ? `<h4>Key assumptions</h4><ul class="assumption-list">${assumptions}</ul>` : ''}
+    ${s.personal_impact ? `<h4 style="margin-top:10px">Your personal impact</h4><p>${s.personal_impact}</p>` : ''}
+  `;
+}
+
+function renderHistorical(items) {
+  const list = $('historical-list');
+  list.innerHTML = '';
+  items.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'historical-card';
+    div.innerHTML = `
+      <div class="hist-event">${h.event} <span class="hist-year">(${h.year})</span></div>
+      <div class="hist-summary">${(h.summary||'').slice(0,200)}</div>
+      ${h.lesson ? `<div class="hist-lesson">Lesson: ${h.lesson}</div>` : ''}
+    `;
+    list.appendChild(div);
+  });
+  show('historical-section');
+}
+
+function renderDone(d) {
+  $('done-agents').textContent      = `${d.agents_completed} agents`;
+  $('done-confidence').textContent  = `${((d.overall_confidence||0)*100).toFixed(0)}%`;
+  $('done-predictions').textContent = `${d.predictions_logged||0}`;
+  show('done-bar');
+  hide('status-bar');
+}
+
+// ── Utilities ──────────────────────────────────────────────
+
+function setStatus(msg) {
+  statusMsg.textContent = msg;
+}
+
+function show(id) { $(id).style.display = 'block'; }
+function hide(id) { $(id).style.display = 'none'; }
+
+function finishRun() {
+  state.isRunning = false;
+  submitBtn.disabled = false;
+  if (state.eventSource) { state.eventSource.close(); state.eventSource = null; }
+  // Stop spinner
+  statusBar.querySelector('.spinner').style.display = 'none';
+}
+
+function resetUI() {
+  queryInput.value = '';
+  charCount.textContent = '0 / 500';
+  resetOutputPanels();
+  queryInput.focus();
+}
+
+function resetOutputPanels() {
+  [
+    'complexity-card','sources-bar','agents-section','chain-section',
+    'scenarios-section','historical-section','personal-section',
+    'summary-section','done-bar',
+  ].forEach(id => { $(id).style.display = 'none'; });
+
+  agentsGrid.innerHTML   = '';
+  chainLinks.innerHTML   = '';
+  chainNarr.textContent  = '';
+  personalText.textContent = '';
+  summaryText.innerHTML  = '';
+  $('sources-list').innerHTML = '';
+  $('historical-list').innerHTML = '';
+  state.scenarios = {};
+  state.activeScen = 'best';
+  document.querySelectorAll('.scenario-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.scenario-tab.best').classList.add('active');
+
+  // Reset spinner
+  statusBar.querySelector('.spinner').style.display = 'block';
+  hide('status-bar');
+}
+
+function formatMarkdown(text) {
+  // Bold **text**, headers, basic formatting
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^#{1,3}\s(.+)$/gm, '<strong>$1</strong>');
+}
+
+function generateId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// Auto-scroll to chain section as it fills
+const observer = new MutationObserver(() => {
+  if (chainNarr.textContent.length % 200 < 5) {
+    chainNarr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+});
+observer.observe(chainNarr, { childList: true, characterData: true, subtree: true });
+</script>
+</body>
+</html>
