@@ -1,6 +1,24 @@
 """
+NewsAPI provides headlines from 80,000+ news sources.
+Free tier: 100 requests/day, last 30 days of archives.
+
+We use it as a backup news source to complement Tavily.
+While Tavily gives rich summarized content, NewsAPI gives
+us breadth — more sources, more headlines.
+
+API: https://newsapi.org/v2/everything
+
+Usage:
+  from data.fetchers.newsapi import fetch_newsapi_headlines
+  articles = await fetch_newsapi_headlines("Federal Reserve interest rates")
+"""
+
+import asyncio
+from typing import Optional
+
+import httpx
+
 data/fetchers/newsapi.py — NewsAPI News Fetcher
-=================================================
 NewsAPI aggregates headlines from 150,000+ news sources
 worldwide. Useful as a secondary news source alongside Tavily.
 

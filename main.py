@@ -45,6 +45,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from config import settings
+from graph.state import create_initial_state
+from graph.pipeline import run_pipeline_streaming
 
 # ─────────────────────────────────────────────
 # APP SETUP
@@ -202,6 +204,7 @@ async def health_check():
     Returns app status, active session count, and key availability.
     Useful for monitoring and debugging.
     """
+    from data.cache import cache
     return JSONResponse({
         "status":           "ok",
         "version":          "0.1.0",
@@ -212,6 +215,7 @@ async def health_check():
         "finnhub_ready":    bool(settings.FINNHUB_API_KEY),
         "free_mode":        settings.FREE_MODE_ONLY,
         "debug_mode":       settings.DEBUG_AGENTS,
+        "cache":            cache.stats(),
         "timestamp":        datetime.utcnow().isoformat(),
     })
 
@@ -284,65 +288,104 @@ async def cascade_stream(
     if len(sessions) % 10 == 0:
         cleanup_expired_sessions()
 
+    # ── Add query to conversation history ─────────────────────
+    session["conversation"].append({
+        "role":      "user",
+        "content":   query,
+        "timestamp": datetime.utcnow().isoformat(),
+    })
+
+    # ── Build initial state ────────────────────────────────────
+    initial_state = create_initial_state(
+        query=      query,
+        session_id= sid,
+        profile=    session.get("profile", {}),
+        history=    session.get("conversation", []),
+    )
+
     async def event_stream():
         """
-        The actual streaming generator.
-        Yields SSE events as each pipeline stage completes.
-        Everything in here runs sequentially for now —
-        parallel execution comes when we wire up LangGraph.
+        Connects the pipeline to the SSE stream.
+
+        Pattern:
+          1. Create an asyncio.Queue to receive events from the pipeline.
+          2. Run the pipeline in a background task — it puts events into the queue.
+          3. This generator reads from the queue and yields SSE events.
+          4. A heartbeat runs every 15s to keep the connection alive.
+          5. When the pipeline puts a "done" event, we stop.
         """
+        event_queue:   asyncio.Queue = asyncio.Queue()
+        pipeline_task: asyncio.Task  = None
+
         try:
-            # ── Stage 1: Acknowledge receipt ──────────────
+            # Yield first status immediately so the browser knows we're alive
             yield {
                 "data": json.dumps({
                     "type":       "status",
-                    "message":    "Query received — analysing complexity...",
+                    "message":    "Query received — starting Cascade...",
                     "session_id": sid,
                 })
             }
-            await asyncio.sleep(0)  # yield control to event loop
+            await asyncio.sleep(0)
 
-            # ── Stage 2: Add to conversation history ──────
-            session["conversation"].append({
-                "role":      "user",
-                "content":   query,
-                "timestamp": datetime.utcnow().isoformat(),
-            })
+            # Start pipeline as a background task
+            pipeline_task = asyncio.create_task(
+                run_pipeline_streaming(initial_state, event_queue)
+            )
 
-            # ── Stage 3: Run the pipeline ──────────────────
-            # For now: placeholder response while we build the agents.
-            # This gets replaced with the real LangGraph pipeline in Phase 2.
-            yield {
-                "data": json.dumps({
-                    "type":    "status",
-                    "message": "🚧 Pipeline not connected yet — agents coming in Phase 2",
-                })
-            }
-            await asyncio.sleep(0.5)
+            # Drain events from the queue and yield them to the browser
+            done_seen = False
+            while not done_seen:
+                try:
+                    # Wait up to 15s for the next event (heartbeat interval)
+                    event = await asyncio.wait_for(event_queue.get(), timeout=15)
+                    yield event
 
-            # ── Stage 4: Done ──────────────────────────────
-            yield {
-                "data": json.dumps({
-                    "type":       "done",
-                    "session_id": sid,
-                    "message":    "Analysis complete",
-                })
-            }
+                    # Check if pipeline finished
+                    payload = json.loads(event.get("data", "{}"))
+                    if payload.get("type") in ("done", "error"):
+                        done_seen = True
+
+                    event_queue.task_done()
+
+                except asyncio.TimeoutError:
+                    # No event in 15s — send heartbeat to keep connection alive
+                    yield {"data": json.dumps({"type": "heartbeat"})}
+
+                except asyncio.CancelledError:
+                    break
+
+            # Wait for pipeline to finish cleanly
+            if pipeline_task and not pipeline_task.done():
+                try:
+                    final_state = await asyncio.wait_for(pipeline_task, timeout=5)
+                    # Save assistant turn to conversation history
+                    if final_state and final_state.summary:
+                        session["conversation"].append({
+                            "role":      "assistant",
+                            "content":   final_state.summary[:500],
+                            "timestamp": datetime.utcnow().isoformat(),
+                        })
+                except asyncio.TimeoutError:
+                    pipeline_task.cancel()
 
         except asyncio.CancelledError:
-            # Client disconnected mid-stream — clean exit
+            # Browser disconnected mid-stream
             if settings.DEBUG_AGENTS:
-                print(f"🔌 Client disconnected for session {sid[:8]}...")
+                print(f"🔌 Client disconnected: session {sid[:8]}")
+            if pipeline_task and not pipeline_task.done():
+                pipeline_task.cancel()
 
         except Exception as e:
-            # Unexpected error — send error event to frontend
             print(f"❌ Stream error for session {sid[:8]}: {e}")
             yield {
                 "data": json.dumps({
                     "type":    "error",
-                    "message": "Something went wrong. Please try again.",
+                    "message": "An unexpected error occurred. Please try again.",
                 })
             }
+            if pipeline_task and not pipeline_task.done():
+                pipeline_task.cancel()
 
     return EventSourceResponse(event_stream())
 
@@ -424,10 +467,11 @@ if __name__ == "__main__":
     Very useful during development — no need to manually restart.
     Turn off in production.
     """
+    import os
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=int(os.environ.get("PORT", 8000)),
         reload=True,       # auto-restart on file changes
         log_level="info",
     )

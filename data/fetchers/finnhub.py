@@ -1,6 +1,24 @@
 """
+Finnhub provides real-time stock quotes, forex rates, commodity prices,
+and market news. Free tier: 60 calls/minute.
+
+What we fetch:
+  - Key stock indices (SPY, QQQ, DIA) as market health proxies
+  - Major commodity ETFs (GLD, USO, DBA)
+  - Currency pairs (USD/EUR, USD/JPY, USD/CNY)
+  - Macro news for the user's query
+
+Usage:
+  from data.fetchers.finnhub import fetch_finnhub_data
+  data = await fetch_finnhub_data(query="US China trade war")
+"""
+
+import asyncio
+from typing import Optional
+
+import httpx
+
 data/fetchers/finnhub.py — Finnhub Financial Data Fetcher
-===========================================================
 Finnhub provides real-time financial market data:
 stock prices, forex rates, commodity prices, economic
 indicators, and company news.

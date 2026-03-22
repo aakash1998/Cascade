@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Cascade API (uvicorn)",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["main:app", "--host", "0.0.0.0", "--reload"],
+      "port": 8000
+    }
+  ]
+}

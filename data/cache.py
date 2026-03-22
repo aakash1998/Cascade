@@ -1,85 +1,101 @@
 """
-data/cache.py — Simple in-memory TTL cache
-============================================
-Prevents hammering the same API twice in one session.
-Every fetcher checks this cache before making a network call.
-
-How it works:
-  - Every API response is stored with a timestamp
-  - On next request for same key, if timestamp is within TTL → return cached
-  - If TTL expired → fetch fresh data, update cache
-  - Cache lives in RAM — resets when app restarts (by design)
-
-Why this matters for cost:
-  If 10 users ask about the US-China trade war in the same hour,
-  Tavily is only called once. The other 9 get the cached result instantly.
-  Saves tokens, saves money, saves time.
+data/cache.py — In-memory TTL cache for API responses
 
 Usage:
   from data.cache import cache
 
-  cache.set("fred_cpi", {"value": 3.2}, ttl=3600)
-  data = cache.get("fred_cpi")   # returns None if expired
+  data = cache.get("fred:UNRATE")
+  if data is None:
+      data = await fetch_fred_unemployment()
+      cache.set("fred:UNRATE", data)
 """
 
 import time
 from typing import Any, Optional
 
+from config import settings
+
+
+class _CacheEntry:
+    """One item stored in the cache with an expiry timestamp."""
+
+    def __init__(self, value: Any, ttl: int):
+        self.value = value
+        self.expires_at = time.monotonic() + ttl
+
+    def is_expired(self) -> bool:
+        return time.monotonic() > self.expires_at
+
 
 class TTLCache:
     """
-    Simple in-memory key-value cache with per-entry TTL.
-    Thread-safe enough for single-process async use.
+    In-memory key-value cache where each entry expires after `ttl` seconds.
+
+    Not thread-safe — fine for asyncio (single-threaded event loop).
+    No size cap — sessions are short so memory growth is bounded.
     """
 
-    def __init__(self):
-        # { key: {"value": ..., "expires_at": float} }
+    def __init__(self, default_ttl: int = None):
         self._store: dict = {}
+        self._default_ttl = default_ttl or settings.CACHE_TTL_SECONDS
 
     def get(self, key: str) -> Optional[Any]:
         """
-        Returns cached value if it exists and hasn't expired.
-        Returns None if missing or expired.
+        Returns the cached value, or None if absent / expired.
+
+        Example:
+            val = cache.get("fred:UNRATE")
+            if val is None:
+                val = await actually_fetch()
         """
         entry = self._store.get(key)
         if entry is None:
             return None
-        if time.time() > entry["expires_at"]:
+        if entry.is_expired():
             del self._store[key]
             return None
-        return entry["value"]
+        return entry.value
 
-    def set(self, key: str, value: Any, ttl: int = 3600) -> None:
+    def set(self, key: str, value: Any, ttl: int = None) -> None:
         """
-        Stores a value with a TTL in seconds.
-        Default TTL: 1 hour (3600 seconds)
+        Stores value under key for ttl seconds (default: CACHE_TTL_SECONDS).
+
+        Example:
+            cache.set("fred:UNRATE", {"value": 4.1})
+            cache.set("tavily:trade", [...], ttl=1800)
         """
-        self._store[key] = {
-            "value":      value,
-            "expires_at": time.time() + ttl,
-        }
+        self._store[key] = _CacheEntry(value, ttl or self._default_ttl)
 
     def delete(self, key: str) -> None:
-        """Removes a key from cache."""
+        """Evicts a specific entry."""
         self._store.pop(key, None)
 
     def clear(self) -> None:
-        """Clears entire cache — useful for testing."""
+        """Removes all entries."""
         self._store.clear()
 
+    def purge_expired(self) -> int:
+        """Removes expired entries and returns the count removed."""
+        expired = [k for k, e in self._store.items() if e.is_expired()]
+        for k in expired:
+            del self._store[k]
+        return len(expired)
+
     def size(self) -> int:
-        """Returns number of non-expired entries."""
-        now = time.time()
-        return sum(1 for e in self._store.values() if e["expires_at"] > now)
+        """Returns the number of live (non-expired) entries."""
+        self.purge_expired()
+        return len(self._store)
 
     def stats(self) -> dict:
-        """Returns cache stats for debugging."""
-        now = time.time()
-        total   = len(self._store)
-        active  = sum(1 for e in self._store.values() if e["expires_at"] > now)
-        expired = total - active
-        return {"total": total, "active": active, "expired": expired}
+        """Returns cache statistics for the /health endpoint."""
+        return {
+            "active_entries": self.size(),
+            "default_ttl_sec": self._default_ttl,
+        }
 
 
-# Global cache instance — shared across all fetchers
+# ─────────────────────────────────────────────
+# SINGLETON — one shared cache for the whole process
+# ─────────────────────────────────────────────
+
 cache = TTLCache()

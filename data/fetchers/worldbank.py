@@ -1,6 +1,30 @@
 """
+The World Bank API provides 16,000+ development indicators for every
+country. Completely free, no API key needed.
+
+What we fetch:
+  - GDP per capita for major economies
+  - Trade openness (exports + imports as % of GDP)
+  - FDI (foreign direct investment) inflows
+  - Population and demographic data
+  - Health and education indices
+
+Best for: Long-run structural context, country comparisons,
+          development trends. Not real-time — annual data.
+
+API: https://api.worldbank.org/v2/
+
+Usage:
+  from data.fetchers.worldbank import fetch_worldbank_indicators
+  data = await fetch_worldbank_indicators(countries=["US", "CN", "CA"])
+"""
+
+import asyncio
+from typing import Optional
+
+import httpx
+
 data/fetchers/worldbank.py — World Bank Data Fetcher
-======================================================
 The World Bank provides free economic and development data
 for 196 countries. No API key needed.
 

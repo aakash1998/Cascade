@@ -1,6 +1,28 @@
 """
+FRED (Federal Reserve Economic Data) provides 800,000+ free economic
+time series from the US Federal Reserve. No API key required for
+basic access (key unlocks higher rate limits).
+
+Key indicators we fetch:
+  UNRATE    — Unemployment rate
+  CPIAUCSL  — Consumer Price Index (inflation)
+  GDP       — US GDP growth
+  FEDFUNDS  — Federal funds rate (interest rates)
+  DXY       — US Dollar index (via DTWEXBGS)
+  T10Y2Y    — Yield curve (recession indicator)
+  MORTGAGE30US — 30-year mortgage rate
+
+Usage:
+  from data.fetchers.fred import fetch_fred_indicators
+  data = await fetch_fred_indicators()
+"""
+
+import asyncio
+from typing import Optional
+
+import httpx
+
 data/fetchers/fred.py — FRED Economic Data Fetcher
-====================================================
 FRED (Federal Reserve Economic Data) is the most comprehensive
 free source of economic data in the world.
 

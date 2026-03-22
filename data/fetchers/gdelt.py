@@ -1,6 +1,28 @@
 """
+GDELT (Global Database of Events, Language, and Tone) monitors
+world news in near real-time and assigns tone/sentiment scores.
+It's completely free with no API key needed.
+
+What it gives us:
+  - Real-time article headlines from thousands of news sources
+  - Tone score: negative = bad news, positive = good news
+  - Country and actor codes for geographic context
+  - Great for detecting sentiment shifts around world events
+
+API: GDELT 2.0 GKG API via their public endpoint
+
+Usage:
+  from data.fetchers.gdelt import fetch_gdelt_events
+  events = await fetch_gdelt_events("US China tariffs trade war")
+"""
+
+import asyncio
+from typing import Optional
+from urllib.parse import quote
+
+import httpx
+
 data/fetchers/gdelt.py — GDELT World Events Fetcher
-=====================================================
 GDELT (Global Database of Events, Language, and Tone) monitors
 the world's news media in 100+ languages and updates every 15
 minutes. It is the most comprehensive free source of world

@@ -1,6 +1,24 @@
 """
+Tavily is an AI-powered search API designed specifically for LLMs.
+It returns clean, summarized results — no HTML scraping needed.
+
+Why Tavily:
+  - Purpose-built for RAG (retrieval augmented generation)
+  - Returns pre-summarized snippets, not raw HTML
+  - Replaces 15+ individual news APIs with one call
+  - Free tier: 1000 searches/month
+
+Used by Scout to get current news and web context for any query.
+
+Usage:
+  from data.fetchers.tavily import fetch_tavily
+  results = await fetch_tavily("US China trade war impact on tech sector")
+"""
+
+import asyncio
+from typing import Optional
+
 data/fetchers/tavily.py — Tavily Web Search Fetcher
-=====================================================
 Tavily is the primary data source for Cascade.
 It replaces 15+ individual news APIs with one search tool.
 
