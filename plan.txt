@@ -1,0 +1,95 @@
+Here's the build order — each step builds on the previous one:
+
+---
+
+**Phase 1 — Foundation (get something running)**
+```
+1. config.py          — all settings, loads .env, one source of truth
+2. main.py            — FastAPI app, just the skeleton
+3. llm/providers.py   — Claude + Groq wrappers + fallback chain
+4. Test: python main.py runs without errors
+```
+
+---
+
+**Phase 2 — First agent working end to end**
+```
+5. graph/state.py         — CascadeState, the shared memory object
+6. agents/base_agent.py   — base class every agent inherits
+7. agents/orchestrator.py — reads query, scores complexity, returns manifest
+8. Test: send a query, orchestrator returns which agents to spin up
+```
+
+---
+
+**Phase 3 — Data layer**
+```
+9.  data/fetchers/tavily.py    — web search for all agents
+10. data/fetchers/finnhub.py   — financial + market data
+11. data/fetchers/fred.py      — economic indicators (no key needed)
+12. data/cache.py              — simple TTL cache so we don't repeat calls
+13. data/context_builder.py    — assembles all fetched data into one object
+14. Test: fetch context for a query, see real data come back
+```
+
+---
+
+**Phase 4 — Domain agents**
+```
+15. agents/scout.py            — runs all fetchers in parallel
+16. agents/domain/energy.py    — first domain agent (template for all others)
+17. agents/domain/*.py         — remaining 22 agents (copy + modify energy.py)
+18. Test: one full query, all agents run, see raw outputs
+```
+
+---
+
+**Phase 5 — Synthesis**
+```
+19. agents/connector.py        — builds ripple chain from agent outputs
+20. agents/debate_moderator.py — surfaces conflicts between agents
+21. agents/historian.py        — finds similar past events
+22. agents/scenario_builder.py — best / base / worst branches
+23. agents/personaliser.py     — applies user profile
+24. agents/summariser.py       — final plain language summary
+25. Test: full pipeline runs, get a complete ripple chain
+```
+
+---
+
+**Phase 6 — Trust + safety**
+```
+26. agents/watchdog.py         — hallucination detection
+27. trust/citation.py          — source attribution on every claim
+28. predictions/logger.py      — logs every claim to SQLite
+29. safety/input_filter.py     — block bad queries
+30. Test: full pipeline with trust layer
+```
+
+---
+
+**Phase 7 — Streaming + UI**
+```
+31. streaming/sse.py           — Server-Sent Events
+32. graph/pipeline.py          — full LangGraph graph wired together
+33. graph/routers.py           — conditional edges (QA fail loop etc)
+34. frontend/index.html        — single page UI
+35. frontend/cascade.js        — SSE listener, renders live
+36. Test: open browser, type query, watch agents stream live
+```
+
+---
+
+**Phase 8 — Polish**
+```
+37. sharing/snapshots.py       — shareable links
+38. session/manager.py         — conversation memory
+39. predictions/verifier.py    — checks past predictions against real data
+40. Azure swap-in              — replace local files/SQLite with Azure
+```
+
+---
+
+Each phase gives you something testable. You'll see real output after Phase 2 — that's less than an hour of work.
+
+**Ready to write `config.py`?**

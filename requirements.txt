@@ -1,0 +1,51 @@
+# ============================================================
+# Cascade — requirements.txt
+# Install everything with: pip install -r requirements.txt
+# ============================================================
+
+# ── WEB FRAMEWORK ───────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+sse-starlette==2.1.3
+slowapi==0.1.9
+
+# ── LLM + AGENTS ────────────────────────────────────────────
+anthropic==0.40.0
+langchain==0.3.7
+langchain-core>=0.3.17 
+langchain-anthropic==0.3.0
+langchain-groq==0.2.1
+langchain-community==0.3.7
+langgraph==0.2.55
+groq==0.11.0
+
+# ── SEARCH ──────────────────────────────────────────────────
+tavily-python==0.5.0
+
+# ── DATA + HTTP ─────────────────────────────────────────────
+httpx==0.27.2
+requests==2.32.3
+aiohttp==3.10.10
+feedparser==6.0.11
+
+# ── FINANCIAL DATA ──────────────────────────────────────────
+finnhub-python==2.4.20
+
+# ── KNOWLEDGE GRAPH ─────────────────────────────────────────
+networkx==3.4.2
+
+# ── LOCAL STORAGE ───────────────────────────────────────────
+sqlite-utils==3.37
+
+# ── DATA PROCESSING ─────────────────────────────────────────
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# ── EXPORT ──────────────────────────────────────────────────
+weasyprint==62.3
+
+# ── UTILITIES ───────────────────────────────────────────────
+python-dateutil==2.9.0
+pytz==2024.2
+tenacity==9.0.0
