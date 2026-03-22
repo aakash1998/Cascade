@@ -1,38 +1,5 @@
 """
 agents/base_agent.py — Abstract base class for all Cascade agents
-==================================================================
-Every agent in the system (domain agents, orchestrator, connector,
-summariser, etc.) inherits from BaseAgent.
-
-What this provides:
-  - Consistent interface: every agent has a run() method
-  - Shared error handling with automatic retries
-  - Timeout enforcement (AGENT_TIMEOUT_SECONDS)
-  - Structured logging for every agent call
-  - Cost tracking hooks
-
-How to create a new agent:
-  class EnergyAgent(BaseAgent):
-      name   = "Energy Agent"
-      domain = "energy"
-      tier   = "tier2"        # tier1 = Claude, tier2 = Groq (free)
-
-      async def _execute(self, state: CascadeState) -> AgentOutput:
-          prompt = build_agent_prompt(state.query, self.domain, ...)
-          raw    = await call_llm(prompt, tier=self.tier, ...)
-          data   = json.loads(raw)
-          return AgentOutput(
-              agent_name=self.name,
-              domain=self.domain,
-              finding=data["finding"],
-              confidence=data["confidence"],
-              ...
-          )
-"""
-
-import json
-import asyncio
-from abc import ABC, abstractmethod
 from typing import Optional
 
 from config import settings

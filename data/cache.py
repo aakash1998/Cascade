@@ -1,19 +1,5 @@
 """
 data/cache.py — In-memory TTL cache for API responses
-======================================================
-Prevents hammering the same API endpoint twice in one session.
-Every data fetcher checks this cache before making a network call.
-
-How it works:
-  1. Fetcher calls cache.get(key) — returns None if miss or expired
-  2. On a miss, fetcher makes the real API call
-  3. Fetcher calls cache.set(key, data) to store the result
-  4. Next call within TTL seconds gets data instantly from cache
-
-Why this matters:
-  - Multiple domain agents need the same FRED data
-  - Without caching, we'd hit the same endpoint 10+ times per query
-  - With caching, we hit it once and reuse the result for all agents
 
 Usage:
   from data.cache import cache

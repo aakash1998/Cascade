@@ -1,37 +1,5 @@
 """
 agents/scout.py — Parallel data fetcher / context assembler
-============================================================
-Scout runs immediately after the Orchestrator. Its job is to gather
-real-time data from all available APIs in parallel before the domain
-agents start. This way, every domain agent gets fresh data without
-each making its own API calls.
-
-What Scout fetches (all in parallel):
-  1. Tavily   — rich web search for current news
-  2. FRED     — US economic indicators (GDP, inflation, unemployment)
-  3. Finnhub  — market data (stock indices, commodities)
-  4. GDELT    — global event signals + sentiment scores
-  5. NewsAPI  — additional news headlines (if key available)
-  6. WorldBank — long-run development indicators
-
-Results are merged into state.data_context, a dict that every
-domain agent reads when building its prompt.
-
-Why parallel fetching matters:
-  If Scout called APIs sequentially, 6 sources × 5s each = 30s wait.
-  In parallel, all 6 complete in ~5-8s (limited by the slowest source).
-"""
-
-import asyncio
-
-from config import settings
-from graph.state import CascadeState
-from data.fetchers.tavily    import fetch_tavily
-from data.fetchers.fred      import fetch_fred_indicators
-from data.fetchers.finnhub   import fetch_finnhub_data
-from data.fetchers.gdelt     import fetch_gdelt_events
-from data.fetchers.newsapi   import fetch_newsapi_headlines
-from data.fetchers.worldbank import fetch_worldbank_indicators
 
 
 async def run_scout(state: CascadeState) -> CascadeState:
