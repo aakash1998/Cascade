@@ -96,7 +96,7 @@ class Settings:
     FINNHUB_API_KEY: str   = field(default_factory=lambda: _get("FINNHUB_API_KEY"))
     FRED_API_KEY: str      = field(default_factory=lambda: _get("FRED_API_KEY"))
     ALPHA_VANTAGE_KEY: str = field(default_factory=lambda: _get("ALPHA_VANTAGE_KEY"))
-
+    NEWS_API_KEY: str = field(default_factory=lambda: _get("NEWS_API_KEY"))
     # These sources need no API key — always enabled
     WORLD_BANK_ENABLED: bool  = True
     GDELT_ENABLED: bool       = True
